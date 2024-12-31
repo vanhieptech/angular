@@ -5,31 +5,55 @@ import { PlatformDetector } from '../interfaces/message.interface';
   providedIn: 'root',
 })
 export class PlatformDetectorService implements PlatformDetector {
+  private readonly userAgent = navigator.userAgent.toLowerCase();
+  private readonly platform = navigator.platform;
+
   isEmbeddedWebView(): boolean {
     return this.isIOSWebView() || this.isAndroidWebView();
   }
 
   isIOSWebView(): boolean {
-    // Check for WKWebView
-    const hasWebKit =
-      'webkit' in window && 'messageHandlers' in (window as any).webkit;
+    const isIOS = /ipad|iphone|ipod/.test(this.userAgent);
 
-    // Additional iOS WebView checks
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (!isIOS) return false;
+
+    // Check for WebKit and specific message handler
+    const webkit = (window as any).webkit;
+    const hasWebKit = 'webkit' in window && 'messageHandlers' in webkit;
+    const hasPostMessageListener =
+      hasWebKit && 'postMessageListener' in webkit.messageHandlers;
+
     const notStandalone = !(window.navigator as any).standalone;
-    const notSafari = !navigator.userAgent.includes('Safari');
+    const notSafari = !/safari/.test(this.userAgent);
+    const hasAppleDevice = /apple/i.test(this.platform);
 
-    return isIOS && hasWebKit && notStandalone && notSafari;
+    // Must have WebKit, postMessageListener, and meet other iOS WebView criteria
+    return (
+      hasWebKit &&
+      hasPostMessageListener &&
+      notStandalone &&
+      notSafari &&
+      hasAppleDevice
+    );
   }
 
   isAndroidWebView(): boolean {
-    // Check for Android WebView bridge
+    const isAndroid = /android/.test(this.userAgent);
+
+    if (!isAndroid) return false;
+
+    // Comprehensive Android WebView checks
     const hasAndroidBridge = 'Android' in window;
+    const isWebView = /wv|webview/.test(this.userAgent);
+    const hasVersionString = /version\/\d/.test(this.userAgent);
+    const noChrome =
+      !/chrome/.test(this.userAgent) ||
+      (/chrome/.test(this.userAgent) && /android/.test(this.userAgent));
 
-    // Additional Android WebView checks
-    const isAndroid = /Android/.test(navigator.userAgent);
-    const isWebView = /wv|WebView/.test(navigator.userAgent);
+    return hasAndroidBridge || (isWebView && hasVersionString && noChrome);
+  }
 
-    return isAndroid && (hasAndroidBridge || isWebView);
+  isBrowser(): boolean {
+    return !this.isEmbeddedWebView();
   }
 }
