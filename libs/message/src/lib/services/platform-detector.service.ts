@@ -1,12 +1,10 @@
 import { Injectable } from '@angular/core';
-import { PlatformDetector } from '../interfaces/message.interface';
 
 @Injectable({
   providedIn: 'root',
 })
-export class PlatformDetectorService implements PlatformDetector {
+export class PlatformDetectorService {
   private readonly userAgent = navigator.userAgent.toLowerCase();
-  private readonly platform = navigator.platform;
 
   isEmbeddedWebView(): boolean {
     return this.isIOSWebView() || this.isAndroidWebView();
@@ -17,24 +15,25 @@ export class PlatformDetectorService implements PlatformDetector {
 
     if (!isIOS) return false;
 
-    // Check for WebKit and specific message handler
-    const webkit = (window as any).webkit;
-    const hasWebKit = 'webkit' in window && 'messageHandlers' in webkit;
-    const hasPostMessageListener =
-      hasWebKit && 'postMessageListener' in webkit.messageHandlers;
+    try {
+      // Primary check: Verify WebKit bridge exists
+      const webkit = (window as any).webkit;
+      if (!webkit?.messageHandlers?.postMessageListener) {
+        return false;
+      }
 
-    const notStandalone = !(window.navigator as any).standalone;
-    const notSafari = !/safari/.test(this.userAgent);
-    const hasAppleDevice = /apple/i.test(this.platform);
+      // Secondary checks to exclude browsers
+      const notStandalone = !(window.navigator as any).standalone;
+      const notSafari = !/safari/.test(this.userAgent);
 
-    // Must have WebKit, postMessageListener, and meet other iOS WebView criteria
-    return (
-      hasWebKit &&
-      hasPostMessageListener &&
-      notStandalone &&
-      notSafari &&
-      hasAppleDevice
-    );
+      // Additional check for Safari-specific features
+      const isSafariBrowser = 'safari' in window;
+
+      return notStandalone && notSafari && !isSafariBrowser;
+    } catch (error) {
+      console.warn('Error checking iOS WebView:', error);
+      return false;
+    }
   }
 
   isAndroidWebView(): boolean {
@@ -42,18 +41,28 @@ export class PlatformDetectorService implements PlatformDetector {
 
     if (!isAndroid) return false;
 
-    // Comprehensive Android WebView checks
-    const hasAndroidBridge = 'Android' in window;
-    const isWebView = /wv|webview/.test(this.userAgent);
-    const hasVersionString = /version\/\d/.test(this.userAgent);
-    const noChrome =
-      !/chrome/.test(this.userAgent) ||
-      (/chrome/.test(this.userAgent) && /android/.test(this.userAgent));
+    try {
+      // Primary check: Android bridge
+      if ('Android' in window) {
+        return true;
+      }
 
-    return hasAndroidBridge || (isWebView && hasVersionString && noChrome);
-  }
+      // Secondary checks for WebView
+      const isWebView = /wv|webview/.test(this.userAgent);
+      const hasVersionString = /version\/\d/.test(this.userAgent);
 
-  isBrowser(): boolean {
-    return !this.isEmbeddedWebView();
+      // Exclude Chrome browser
+      const isChromeButNotWebView =
+        /chrome/.test(this.userAgent) && !/wv|webview/.test(this.userAgent);
+
+      if (isChromeButNotWebView) {
+        return false;
+      }
+
+      return isWebView && hasVersionString;
+    } catch (error) {
+      console.warn('Error checking Android WebView:', error);
+      return false;
+    }
   }
 }

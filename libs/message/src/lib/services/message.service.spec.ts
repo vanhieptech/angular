@@ -1,42 +1,74 @@
 import { TestBed } from '@angular/core/testing';
 import { MessageService } from './message.service';
 import { MessageBridgeFactory } from './message-bridge.factory';
-import { PlatformDetectorService } from './platform-detector.service';
-import { Message } from '../interfaces/message.interface';
+import { MessageBridge, Message } from '../interfaces/message.interface';
+import { firstValueFrom } from 'rxjs';
 
 describe('MessageService', () => {
   let service: MessageService;
-  let platformDetector: PlatformDetectorService;
+  let mockBridge: jest.Mocked<MessageBridge>;
+  let mockBridgeFactory: { createBridge: jest.Mock };
 
   beforeEach(() => {
+    mockBridge = {
+      sendMessage: jest.fn(),
+      addMessageListener: jest.fn(),
+      removeMessageListener: jest.fn(),
+    };
+
+    mockBridgeFactory = {
+      createBridge: jest.fn().mockReturnValue(mockBridge),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         MessageService,
-        MessageBridgeFactory,
-        PlatformDetectorService,
+        { provide: MessageBridgeFactory, useValue: mockBridgeFactory },
       ],
     });
 
     service = TestBed.inject(MessageService);
-    platformDetector = TestBed.inject(PlatformDetectorService);
   });
 
-  it('should create', () => {
-    expect(service).toBeTruthy();
+  it('should send messages correctly', async () => {
+    const testMessage = { type: 'TEST', payload: 'test' };
+    await service.sendMessage(testMessage.type, testMessage.payload);
+
+    expect(mockBridge.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('TEST')
+    );
   });
 
-  it('should handle messages with type filtering', (done) => {
+  it('should handle message reception', async () => {
     const testMessage: Message = {
       type: 'TEST',
-      payload: { data: 'test' },
-      source: 'browser',
+      payload: 'test',
+      timestamp: Date.now(),
     };
 
-    service.onMessage('TEST').subscribe((message) => {
-      expect(message).toEqual(testMessage);
-      done();
-    });
+    const messagePromise = firstValueFrom(service.onMessage('TEST'));
 
-    window.postMessage(testMessage, window.location.origin);
+    // Get the callback and simulate message reception
+    const [[callback]] = mockBridge.addMessageListener.mock.calls;
+    callback(JSON.stringify(testMessage));
+
+    const receivedMessage = await messagePromise;
+    expect(receivedMessage).toMatchObject({
+      type: testMessage.type,
+      payload: testMessage.payload,
+    });
+  });
+
+  it('should clean up listeners on destroy', () => {
+    service.ngOnDestroy();
+    expect(mockBridge.removeMessageListener).toHaveBeenCalled();
+  });
+
+  it('should handle invalid message formats', async () => {
+    const [[callback]] = mockBridge.addMessageListener.mock.calls;
+    callback('invalid-json');
+
+    // Should not throw error
+    expect(() => callback('invalid-json')).not.toThrow();
   });
 });
