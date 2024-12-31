@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { WebViewService } from '@angular-monorepo/webview';
+import { MessageService } from '@angular-monorepo/message';
 import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 
@@ -8,7 +8,7 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div>
-      <button (click)="sendMessage()">Send Message to Native App</button>
+      <button (click)="sendMessage()">Send Message</button>
       <div *ngIf="lastMessage">
         Last received message: {{ lastMessage | json }}
       </div>
@@ -16,30 +16,17 @@ import { CommonModule } from '@angular/common';
   `,
 })
 export class AppComponent implements OnInit, OnDestroy {
-  private subscription: Subscription = new Subscription();
+  private subscription = new Subscription();
   lastMessage: any = null;
 
-  constructor(private webViewService: WebViewService) {}
+  constructor(private messageService: MessageService) {}
 
   ngOnInit() {
-    // Listen for all messages
     this.subscription.add(
-      this.webViewService.onMessage().subscribe(
-        (message) => {
-          console.log('Received message:', message);
-          this.lastMessage = message;
-        },
-        (error) => console.error('WebView message error:', error)
-      )
-    );
-
-    // Listen for specific message type
-    this.subscription.add(
-      this.webViewService
-        .onMessage('SPECIFIC_TYPE')
-        .subscribe((message) =>
-          console.log('Received specific message:', message)
-        )
+      this.messageService.onMessage().subscribe((message) => {
+        console.log('Received message:', message);
+        this.lastMessage = message;
+      })
     );
   }
 
@@ -49,8 +36,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   async sendMessage() {
     try {
-      await this.webViewService.sendMessage('TEST_MESSAGE', {
-        text: 'Hello from web!',
+      await this.messageService.sendMessage('TEST_MESSAGE', {
+        text: 'Hello!',
         timestamp: Date.now(),
       });
     } catch (error) {

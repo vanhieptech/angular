@@ -15,7 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@angular-monorepo/webview": ["libs/webview/src/index.ts"]
+      "@angular-monorepo/message": ["libs/message/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

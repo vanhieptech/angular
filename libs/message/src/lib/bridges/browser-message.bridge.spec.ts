@@ -1,21 +1,22 @@
 import { TestBed } from '@angular/core/testing';
-import { BrowserWebViewBridge } from './browser-webview.bridge';
-import { WebViewMessage } from '../interfaces/webview.interface';
+import { BrowserMessageBridge } from './browser-message.bridge';
+import { Message } from '../interfaces/message.interface';
 
-describe('BrowserWebViewBridge', () => {
-  let bridge: BrowserWebViewBridge;
+describe('BrowserMessageBridge', () => {
+  let bridge: BrowserMessageBridge;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [BrowserWebViewBridge],
+      providers: [BrowserMessageBridge],
     });
-    bridge = TestBed.inject(BrowserWebViewBridge);
+    bridge = TestBed.inject(BrowserMessageBridge);
   });
 
   it('should handle cross-tab communication', (done) => {
-    const testMessage: WebViewMessage = {
+    const testMessage: Message = {
       type: 'TEST',
       payload: { data: 'test' },
+      source: 'browser',
     };
 
     bridge.addMessageListener((message) => {
@@ -23,18 +24,18 @@ describe('BrowserWebViewBridge', () => {
       done();
     });
 
-    // Simulate storage event
     const storageEvent = new StorageEvent('storage', {
-      key: 'webview_messages',
+      key: 'browser_messages',
       newValue: JSON.stringify(testMessage),
     });
     window.dispatchEvent(storageEvent);
   });
 
   it('should handle same-window communication', (done) => {
-    const testMessage: WebViewMessage = {
+    const testMessage: Message = {
       type: 'TEST',
       payload: { data: 'test' },
+      source: 'browser',
     };
 
     bridge.addMessageListener((message) => {
@@ -42,7 +43,6 @@ describe('BrowserWebViewBridge', () => {
       done();
     });
 
-    // Simulate postMessage
     window.postMessage(testMessage, window.location.origin);
   });
 });
