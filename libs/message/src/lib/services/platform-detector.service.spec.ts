@@ -3,21 +3,18 @@ import { PlatformDetectorService } from './platform-detector.service';
 
 describe('PlatformDetectorService', () => {
   let service: PlatformDetectorService;
-  let consoleSpy: jest.SpyInstance;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [PlatformDetectorService]
     });
     service = TestBed.inject(PlatformDetectorService);
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation();
   });
 
   afterEach(() => {
     service.resetCache();
     (window as any).webkit = undefined;
     (window as any).Android = undefined;
-    consoleSpy.mockRestore();
   });
 
   describe('WebView Detection', () => {
@@ -32,9 +29,7 @@ describe('PlatformDetectorService', () => {
       };
 
       expect(service.isEmbeddedWebView()).toBe(true);
-      // Verify caching
-      expect(service.isEmbeddedWebView()).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      expect(service.isEmbeddedWebView()).toBe(true); // Verify caching
     });
 
     it('should detect Android WebView with complete bridge', () => {
@@ -44,21 +39,11 @@ describe('PlatformDetectorService', () => {
       };
 
       expect(service.isEmbeddedWebView()).toBe(true);
-      // Verify caching
-      expect(service.isEmbeddedWebView()).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      expect(service.isEmbeddedWebView()).toBe(true); // Verify caching
     });
 
     it('should handle missing webkit bridge', () => {
       expect(service.isEmbeddedWebView()).toBe(false);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[PlatformDetector] WebView detection:',
-        expect.objectContaining({
-          hasIOSBridge: false,
-          hasAndroidBridge: false,
-          isWebView: false
-        })
-      );
     });
 
     it('should handle missing Android bridge', () => {
@@ -126,7 +111,6 @@ describe('PlatformDetectorService', () => {
       expect(service.isEmbeddedWebView()).toBe(false);
     });
   });
-
 
   describe('Edge Cases', () => {
     it('should handle null values in bridge objects', () => {

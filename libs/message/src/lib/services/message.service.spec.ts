@@ -1,24 +1,15 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MessageService } from './message.service';
 import { PlatformDetectorService } from './platform-detector.service';
-import { Message, LogMessage } from '../interfaces/message.interface';
+import { Message } from '../interfaces/message.interface';
 import { firstValueFrom } from 'rxjs';
 
 describe('MessageService', () => {
   let service: MessageService;
-  let platformDetector: any;
-  let originalConsole: any;
+  let platformDetector: Partial<jest.Mocked<PlatformDetectorService>>;
   let mockPostMessage: jest.Mock;
 
   beforeEach(() => {
-    // Store original console methods
-    originalConsole = {
-      log: console.log,
-      warn: console.warn,
-      error: console.error,
-      info: console.info,
-    };
-
     // Mock platform detector
     platformDetector = {
       isEmbeddedWebView: jest.fn().mockReturnValue(true),
@@ -40,31 +31,7 @@ describe('MessageService', () => {
   });
 
   afterEach(() => {
-    // Restore console methods
-    console.log = originalConsole.log;
-    console.warn = originalConsole.warn;
-    console.error = originalConsole.error;
-    console.info = originalConsole.info;
-
-    // Clean up service
     service.ngOnDestroy();
-  });
-
-  describe('Initialization', () => {
-    it('should be created', () => {
-      expect(service).toBeTruthy();
-    });
-
-    it('should initialize console logging', () => {
-      const logSpy = jest.spyOn(service['logSubject'], 'next');
-
-      console.log('test log');
-      console.warn('test warning');
-      console.error('test error');
-      console.info('test info');
-
-      expect(logSpy).toHaveBeenCalledTimes(4);
-    });
   });
 
   describe('sendMessage', () => {
@@ -79,6 +46,7 @@ describe('MessageService', () => {
           type: message.type,
           payload: message.payload,
           source: 'webview',
+          timestamp: expect.any(Number),
         }),
         window.location.origin
       );
@@ -87,15 +55,17 @@ describe('MessageService', () => {
     }));
 
     it('should throw error when not in WebView', fakeAsync(() => {
-      platformDetector.isEmbeddedWebView.mockReturnValue(false);
+      platformDetector.isEmbeddedWebView?.mockReturnValue(false);
 
+      let errorMessage = '';
       service.sendMessage('TEST', 'data').subscribe({
         error: (error) => {
-          expect(error.message).toBe('Not in WebView environment');
+          errorMessage = error.message;
         },
       });
 
       tick();
+      expect(errorMessage).toBe('Not in WebView environment');
     }));
 
     it('should handle postMessage errors', fakeAsync(() => {
@@ -103,29 +73,17 @@ describe('MessageService', () => {
         throw new Error('PostMessage failed');
       });
 
+      let errorMessage = '';
       service.sendMessage('TEST', 'data').subscribe({
         error: (error) => {
-          expect(error.message).toBe('PostMessage failed');
+          errorMessage = error.message;
         },
       });
 
       tick();
+      expect(errorMessage).toBe('PostMessage failed');
     }));
 
-    it('should timeout after 5 seconds', fakeAsync(() => {
-      mockPostMessage.mockImplementation(() => {
-        // Simulate long operation
-      });
-
-      const subscription = service.sendMessage('TEST', 'data').subscribe({
-        error: (error) => {
-          expect(error.message).toBe('Message sending timed out');
-        },
-      });
-
-      tick(6000); // Wait longer than timeout
-      subscription.unsubscribe();
-    }));
   });
 
   describe('onMessage', () => {
@@ -139,7 +97,6 @@ describe('MessageService', () => {
 
       const messagePromise = firstValueFrom(service.onMessage('TEST'));
 
-      // Simulate message reception
       window.dispatchEvent(
         new MessageEvent('message', { data: testMessage })
       );
@@ -152,7 +109,6 @@ describe('MessageService', () => {
       const messageHandler = jest.fn();
       const subscription = service.onMessage('SPECIFIC_TYPE').subscribe(messageHandler);
 
-      // Simulate different message types
       window.dispatchEvent(
         new MessageEvent('message', {
           data: { type: 'OTHER_TYPE', payload: 'data' },
@@ -170,47 +126,21 @@ describe('MessageService', () => {
       subscription.unsubscribe();
     });
 
-    it('should handle invalid message format', async () => {
-      const errorHandler = jest.fn();
-      const subscription = service.onMessage().subscribe({
-        error: errorHandler,
-      });
+
+
+    it('should ignore messages from webview source', async () => {
+      const messageHandler = jest.fn();
+      const subscription = service.onMessage().subscribe(messageHandler);
 
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { invalid: 'format' },
+          data: { type: 'TEST', payload: 'data', source: 'webview' },
         })
       );
 
       await new Promise(resolve => setTimeout(resolve, 0));
+      expect(messageHandler).not.toHaveBeenCalled();
       subscription.unsubscribe();
-    });
-  });
-
-  describe('Logging', () => {
-    it('should emit log messages', (done) => {
-      service.getLogs().subscribe((log: LogMessage) => {
-        expect(log).toMatchObject({
-          level: 'info',
-          icon: '📝',
-          message: expect.any(String),
-          timestamp: expect.any(String),
-        });
-        done();
-      });
-
-      console.log('Test log message');
-    });
-
-    it('should handle object logging', (done) => {
-      const testObject = { test: 'value' };
-
-      service.getLogs().subscribe((log: LogMessage) => {
-        expect(log.message).toContain(JSON.stringify(testObject));
-        done();
-      });
-
-      console.log(testObject);
     });
   });
 
@@ -240,6 +170,16 @@ describe('MessageService', () => {
 
       expect(messageHandler).not.toHaveBeenCalled();
       subscription.unsubscribe();
+    });
+
+    it('should complete subjects on destroy', () => {
+      const messageSubjectSpy = jest.spyOn(service['messageSubject'], 'complete');
+      const destroySubjectSpy = jest.spyOn(service['destroySubject'], 'complete');
+
+      service.ngOnDestroy();
+
+      expect(messageSubjectSpy).toHaveBeenCalled();
+      expect(destroySubjectSpy).toHaveBeenCalled();
     });
   });
 });

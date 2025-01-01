@@ -1,11 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import {
-  MessageService,
-  PlatformDetectorService,
-  LogMessage
-} from '@angular-monorepo/message';
+import { MessageService, PlatformDetectorService } from '@angular-monorepo/message';
 import { Subscription, EMPTY } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -13,12 +9,10 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div class="container">
-      <!-- Platform Status -->
       <div class="status-bar" [class.webview]="isWebView">
         Running in: {{ isWebView ? 'WebView' : 'Browser' }}
       </div>
 
-      <!-- Action Section -->
       <div class="action-section">
         <button *ngIf="isWebView" (click)="sendMessage()" class="message-button">
           Send Test Message
@@ -28,34 +22,9 @@ import { CommonModule } from '@angular/common';
         </div>
       </div>
 
-      <!-- Message Display -->
       <div *ngIf="lastMessage" class="message-display">
         <div class="message-header">Last Message Received:</div>
         <pre>{{ lastMessage | json }}</pre>
-      </div>
-
-      <!-- Log Display -->
-      <div class="log-container">
-        <div class="log-header">
-          <span>Debug Console</span>
-          <div class="log-controls">
-            <button class="control-button" (click)="toggleAutoScroll()">
-              {{ autoScroll ? '🔒 Auto-scroll ON' : '🔓 Auto-scroll OFF' }}
-            </button>
-            <button class="clear-button" (click)="clearLogs()">
-              🗑️ Clear Logs
-            </button>
-          </div>
-        </div>
-        <div class="log-content" #logContent>
-          <div *ngFor="let log of logs"
-               class="log-entry"
-               [class.error]="log.level === 'error'"
-               [class.warning]="log.level === 'warning'"
-               [class.success]="log.level === 'info'">
-            [{{ log.timestamp | date:'HH:mm:ss' }}] {{ log.icon }} {{ log.message }}
-          </div>
-        </div>
       </div>
     </div>
   `,
@@ -204,43 +173,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private subscription = new Subscription();
   lastMessage: any = null;
   isWebView: boolean;
-  logs: LogMessage[] = [];
-  autoScroll = true;
 
   constructor(
     private messageService: MessageService,
     private platformDetector: PlatformDetectorService
   ) {
     this.isWebView = this.platformDetector.isEmbeddedWebView();
-  }
-
-  toggleAutoScroll() {
-    this.autoScroll = !this.autoScroll;
-    if (this.autoScroll) {
-      this.scrollToBottom();
-    }
-  }
-
-  private scrollToBottom() {
-    if (this.autoScroll) {
-      setTimeout(() => {
-        const logContent = document.querySelector('.log-content');
-        if (logContent) {
-          logContent.scrollTop = logContent.scrollHeight;
-        }
-      });
-    }
-  }
-
-  clearLogs() {
-    this.logs = [];
-    // Add a clear log message
-    this.logs.push({
-      level: 'info',
-      icon: '✨',
-      message: 'Logs cleared',
-      timestamp: new Date().toISOString()
-    });
   }
 
   sendMessage(): void {
@@ -251,33 +189,12 @@ export class AppComponent implements OnInit, OnDestroy {
         text: 'Hello from Angular!',
         timestamp: Date.now()
       }).pipe(
-        tap(() => console.info('✅ Message sent successfully')),
-        catchError(error => {
-          console.error('❌ Failed to send message:', error);
-          return EMPTY;
-        })
+        catchError(() => EMPTY)
       ).subscribe()
     );
   }
 
   ngOnInit() {
-    // Subscribe to message service logs
-    this.subscription.add(
-      this.messageService.getLogs().subscribe({
-        next: (log) => {
-          this.logs.push(log);
-          // Keep only last 1000 logs
-          if (this.logs.length > 1000) {
-            this.logs = this.logs.slice(-1000);
-          }
-          if (this.autoScroll) {
-            this.scrollToBottom();
-          }
-        }
-      })
-    );
-
-    // Subscribe to messages
     if (this.isWebView) {
       this.subscription.add(
         this.messageService.onMessage().subscribe({
@@ -287,14 +204,9 @@ export class AppComponent implements OnInit, OnDestroy {
         })
       );
     }
-
-    // Log initialization
-    console.info('🚀 Application initialized');
-    console.info(`📱 Running in ${this.isWebView ? 'WebView' : 'Browser'} mode`);
   }
 
   ngOnDestroy() {
     this.subscription.unsubscribe();
-    console.info('👋 Application shutting down');
   }
 }
