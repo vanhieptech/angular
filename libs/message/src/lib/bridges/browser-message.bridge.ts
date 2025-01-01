@@ -20,7 +20,8 @@ export class BrowserMessageBridge implements MessageBridge {
 
     window.addEventListener('message', (event) => {
       if (event.origin === window.location.origin) {
-        this.handleMessage({ ...event.data, source: 'browser' });
+        const message = JSON.parse(event.data || '');
+        this.handleMessage({ ...message, source: 'browser' });
       }
     });
   }

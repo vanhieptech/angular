@@ -7,7 +7,7 @@ export class IOSMessageBridge implements MessageBridge {
 
   constructor() {
     window.addEventListener('message', (event) => {
-      if (event.data?.source === 'native') {
+      if (event.data?.source === 'ios') {
         this.handleMessage(event.data);
       }
     });
@@ -15,7 +15,7 @@ export class IOSMessageBridge implements MessageBridge {
 
   async sendMessage(serializedMessage: string): Promise<void> {
     try {
-      (window as any).webkit?.messageHandlers?.postMessageListener?.(
+      (window as any).webkit?.messageHandlers?.postMessageHandler?.postMessage?.(
         serializedMessage
       );
     } catch (error) {

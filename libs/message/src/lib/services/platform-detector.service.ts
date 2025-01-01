@@ -12,22 +12,35 @@ export class PlatformDetectorService {
 
   isIOSWebView(): boolean {
     const isIOS = /ipad|iphone|ipod/.test(this.userAgent);
+    console.log('[PlatformDetector] iOS check:', {
+      isIOS,
+      userAgent: this.userAgent,
+    });
 
     if (!isIOS) return false;
 
     try {
       // Primary check: Verify WebKit bridge exists
       const webkit = (window as any).webkit;
-      if (!webkit?.messageHandlers?.postMessageListener) {
+      const hasWebKitBridge = !!webkit?.messageHandlers?.postMessageHandler;
+      console.log('[PlatformDetector] WebKit bridge check:', {
+        hasWebKitBridge,
+      });
+
+      if (!hasWebKitBridge) {
         return false;
       }
 
       // Secondary checks to exclude browsers
       const notStandalone = !(window.navigator as any).standalone;
       const notSafari = !/safari/.test(this.userAgent);
-
-      // Additional check for Safari-specific features
       const isSafariBrowser = 'safari' in window;
+
+      console.log('[PlatformDetector] iOS additional checks:', {
+        notStandalone,
+        notSafari,
+        isSafariBrowser,
+      });
 
       return notStandalone && notSafari && !isSafariBrowser;
     } catch (error) {
@@ -38,22 +51,35 @@ export class PlatformDetectorService {
 
   isAndroidWebView(): boolean {
     const isAndroid = /android/.test(this.userAgent);
+    console.log('[PlatformDetector] Android check:', {
+      isAndroid,
+      userAgent: this.userAgent,
+    });
 
     if (!isAndroid) return false;
 
     try {
       // Primary check: Android bridge
-      if ('Android' in window) {
+      const hasAndroidBridge = 'Android' in window;
+      console.log('[PlatformDetector] Android bridge check:', {
+        hasAndroidBridge,
+      });
+
+      if (hasAndroidBridge) {
         return true;
       }
 
       // Secondary checks for WebView
       const isWebView = /wv|webview/.test(this.userAgent);
       const hasVersionString = /version\/\d/.test(this.userAgent);
-
-      // Exclude Chrome browser
       const isChromeButNotWebView =
         /chrome/.test(this.userAgent) && !/wv|webview/.test(this.userAgent);
+
+      console.log('[PlatformDetector] Android additional checks:', {
+        isWebView,
+        hasVersionString,
+        isChromeButNotWebView,
+      });
 
       if (isChromeButNotWebView) {
         return false;

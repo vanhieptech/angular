@@ -7,7 +7,7 @@ export class AndroidMessageBridge implements MessageBridge {
 
   constructor() {
     window.addEventListener('message', (event) => {
-      if (event.data?.source === 'native') {
+      if (event.data?.source === 'android') {
         this.handleMessage(event.data);
       }
     });
