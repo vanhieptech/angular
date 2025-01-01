@@ -4,91 +4,51 @@ import { Injectable } from '@angular/core';
   providedIn: 'root',
 })
 export class PlatformDetectorService {
-  private readonly userAgent = navigator.userAgent.toLowerCase();
+  private isWebViewCached: boolean | null = null;
 
   isEmbeddedWebView(): boolean {
-    return this.isIOSWebView() || this.isAndroidWebView();
-  }
-
-  isIOSWebView(): boolean {
-    const isIOS = /ipad|iphone|ipod/.test(this.userAgent);
-    console.log('[PlatformDetector] iOS check:', {
-      isIOS,
-      userAgent: this.userAgent,
-    });
-
-    if (!isIOS) return false;
-
-    try {
-      // Primary check: Verify WebKit bridge exists
-      const webkit = (window as any).webkit;
-      const hasWebKitBridge = !!webkit?.messageHandlers?.postMessageHandler;
-      console.log('[PlatformDetector] WebKit bridge check:', {
-        hasWebKitBridge,
-      });
-
-      if (!hasWebKitBridge) {
-        return false;
-      }
-
-      // Secondary checks to exclude browsers
-      const notStandalone = !(window.navigator as any).standalone;
-      const notSafari = !/safari/.test(this.userAgent);
-      const isSafariBrowser = 'safari' in window;
-
-      console.log('[PlatformDetector] iOS additional checks:', {
-        notStandalone,
-        notSafari,
-        isSafariBrowser,
-      });
-
-      return notStandalone && notSafari && !isSafariBrowser;
-    } catch (error) {
-      console.warn('Error checking iOS WebView:', error);
-      return false;
+    // Use cached result if available
+    if (this.isWebViewCached !== null) {
+      return this.isWebViewCached;
     }
-  }
-
-  isAndroidWebView(): boolean {
-    const isAndroid = /android/.test(this.userAgent);
-    console.log('[PlatformDetector] Android check:', {
-      isAndroid,
-      userAgent: this.userAgent,
-    });
-
-    if (!isAndroid) return false;
 
     try {
-      // Primary check: Android bridge
-      const hasAndroidBridge = 'Android' in window;
-      console.log('[PlatformDetector] Android bridge check:', {
+
+      // iOS Bridge Check
+      const hasIOSBridge = !!(
+        (window as any).webkit?.messageHandlers?.postMessageHandler?.postMessage &&
+        // Verify it's actually callable
+        typeof (window as any).webkit.messageHandlers.postMessageHandler.postMessage === 'function'
+      );
+
+      // Android Bridge Check (if needed)
+      const hasAndroidBridge = !!(
+        (window as any).Android?.postMessage &&
+        typeof (window as any).Android.postMessage === 'function'
+      );
+
+      // Cache the result
+      this.isWebViewCached = hasIOSBridge || hasAndroidBridge;
+
+      // Log detection result
+      console.log('[PlatformDetector] WebView detection:', {
+        hasIOSBridge,
         hasAndroidBridge,
+        isWebView: this.isWebViewCached
       });
 
-      if (hasAndroidBridge) {
-        return true;
-      }
+      return this.isWebViewCached;
 
-      // Secondary checks for WebView
-      const isWebView = /wv|webview/.test(this.userAgent);
-      const hasVersionString = /version\/\d/.test(this.userAgent);
-      const isChromeButNotWebView =
-        /chrome/.test(this.userAgent) && !/wv|webview/.test(this.userAgent);
-
-      console.log('[PlatformDetector] Android additional checks:', {
-        isWebView,
-        hasVersionString,
-        isChromeButNotWebView,
-      });
-
-      if (isChromeButNotWebView) {
-        return false;
-      }
-
-      return isWebView && hasVersionString;
     } catch (error) {
-      console.warn('Error checking Android WebView:', error);
+      console.warn('[PlatformDetector] Error checking WebView:', error);
+      // Cache negative result to avoid repeated checks
+      this.isWebViewCached = false;
       return false;
     }
+  }
+
+  // Optional: Method to reset cache (useful for testing)
+  resetCache(): void {
+    this.isWebViewCached = null;
   }
 }

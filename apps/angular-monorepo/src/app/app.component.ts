@@ -4,7 +4,8 @@ import {
   PlatformDetectorService,
   LogMessage
 } from '@angular-monorepo/message';
-import { Subscription } from 'rxjs';
+import { Subscription, EMPTY } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -242,19 +243,21 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  async sendMessage() {
-    if (!this.isWebView) {
-      return;
-    }
+  sendMessage(): void {
+    if (!this.isWebView) return;
 
-    try {
-      await this.messageService.sendMessage('TEST_MESSAGE', {
+    this.subscription.add(
+      this.messageService.sendMessage('TEST_MESSAGE', {
         text: 'Hello from Angular!',
         timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    }
+      }).pipe(
+        tap(() => console.info('✅ Message sent successfully')),
+        catchError(error => {
+          console.error('❌ Failed to send message:', error);
+          return EMPTY;
+        })
+      ).subscribe()
+    );
   }
 
   ngOnInit() {

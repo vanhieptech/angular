@@ -3,64 +3,143 @@ import { PlatformDetectorService } from './platform-detector.service';
 
 describe('PlatformDetectorService', () => {
   let service: PlatformDetectorService;
+  let consoleSpy: jest.SpyInstance;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [PlatformDetectorService],
+      providers: [PlatformDetectorService]
     });
     service = TestBed.inject(PlatformDetectorService);
+    consoleSpy = jest.spyOn(console, 'log').mockImplementation();
   });
 
-  describe('iOS WebView Detection', () => {
-    it('should detect iOS WebView when all conditions are met', () => {
-      // Mock iOS environment
-      Object.defineProperty(window.navigator, 'userAgent', {
-        value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
-        configurable: true,
-      });
+  afterEach(() => {
+    service.resetCache();
+    (window as any).webkit = undefined;
+    (window as any).Android = undefined;
+    consoleSpy.mockRestore();
+  });
 
-      // Mock WebKit bridge
+  describe('WebView Detection', () => {
+    it('should detect iOS WebView with complete bridge', () => {
+      const postMessageMock = jest.fn();
       (window as any).webkit = {
         messageHandlers: {
-          postMessageListener: {},
-        },
+          postMessageHandler: {
+            postMessage: postMessageMock
+          }
+        }
       };
 
-      expect(service.isIOSWebView()).toBe(true);
+      expect(service.isEmbeddedWebView()).toBe(true);
+      // Verify caching
+      expect(service.isEmbeddedWebView()).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should return false for Safari browser', () => {
-      Object.defineProperty(window.navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
-        configurable: true,
-      });
+    it('should detect Android WebView with complete bridge', () => {
+      const postMessageMock = jest.fn();
+      (window as any).Android = {
+        postMessage: postMessageMock
+      };
 
-      expect(service.isIOSWebView()).toBe(false);
+      expect(service.isEmbeddedWebView()).toBe(true);
+      // Verify caching
+      expect(service.isEmbeddedWebView()).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle missing webkit bridge', () => {
+      expect(service.isEmbeddedWebView()).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[PlatformDetector] WebView detection:',
+        expect.objectContaining({
+          hasIOSBridge: false,
+          hasAndroidBridge: false,
+          isWebView: false
+        })
+      );
+    });
+
+    it('should handle missing Android bridge', () => {
+      (window as any).Android = undefined;
+      expect(service.isEmbeddedWebView()).toBe(false);
+    });
+
+    it('should handle incomplete iOS bridge structure', () => {
+      (window as any).webkit = {};
+      expect(service.isEmbeddedWebView()).toBe(false);
+
+      (window as any).webkit = { messageHandlers: {} };
+      expect(service.isEmbeddedWebView()).toBe(false);
+
+      (window as any).webkit = { messageHandlers: { postMessageHandler: {} } };
+      expect(service.isEmbeddedWebView()).toBe(false);
+    });
+
+    it('should handle non-function postMessage in iOS bridge', () => {
+      (window as any).webkit = {
+        messageHandlers: {
+          postMessageHandler: {
+            postMessage: 'not a function'
+          }
+        }
+      };
+      expect(service.isEmbeddedWebView()).toBe(false);
+    });
+
+    it('should handle non-function postMessage in Android bridge', () => {
+      (window as any).Android = {
+        postMessage: 'not a function'
+      };
+      expect(service.isEmbeddedWebView()).toBe(false);
     });
   });
 
-  describe('Android WebView Detection', () => {
-    it('should detect Android WebView with Android interface', () => {
-      Object.defineProperty(window.navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.77 Mobile Safari/537.36',
-        configurable: true,
-      });
+  describe('Cache Management', () => {
+    it('should use cached result for subsequent calls', () => {
+      (window as any).webkit = {
+        messageHandlers: {
+          postMessageHandler: {
+            postMessage: jest.fn()
+          }
+        }
+      };
 
-      (window as any).Android = {};
-
-      expect(service.isAndroidWebView()).toBe(true);
+      expect(service.isEmbeddedWebView()).toBe(true);
+      (window as any).webkit = undefined;
+      expect(service.isEmbeddedWebView()).toBe(true);
     });
 
-    it('should return false for Chrome mobile browser', () => {
-      Object.defineProperty(window.navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Mobile Safari/537.36',
-        configurable: true,
-      });
+    it('should reset cache correctly', () => {
+      (window as any).webkit = {
+        messageHandlers: {
+          postMessageHandler: {
+            postMessage: jest.fn()
+          }
+        }
+      };
 
-      expect(service.isAndroidWebView()).toBe(false);
+      expect(service.isEmbeddedWebView()).toBe(true);
+      service.resetCache();
+      (window as any).webkit = undefined;
+      expect(service.isEmbeddedWebView()).toBe(false);
+    });
+  });
+
+
+  describe('Edge Cases', () => {
+    it('should handle null values in bridge objects', () => {
+      (window as any).webkit = null;
+      (window as any).Android = null;
+      expect(service.isEmbeddedWebView()).toBe(false);
+    });
+
+    it('should handle undefined message handlers', () => {
+      (window as any).webkit = {
+        messageHandlers: undefined
+      };
+      expect(service.isEmbeddedWebView()).toBe(false);
     });
   });
 });
